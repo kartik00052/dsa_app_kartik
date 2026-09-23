@@ -1189,7 +1189,7 @@ function filtered(){
   if(F.pat!=="all")arr=arr.filter(q=>pat(q).l===F.pat);
   if(F.co!=="all")arr=arr.filter(q=>cos(q.co).includes(F.co));
   if(F.src!=="all")arr=arr.filter(q=>F.src==="NeetCode"?q.nc:true);
-  if(F.st!=="all")arr=arr.filter(q=>{const g=get(q.i);return F.st==="Solved"?(g.s===2||g.m):F.st==="Not Started"?g.s===0&&!g.m:q&&g.s===DIFFS.indexOf("")+99?false:g.s===["Not Started","Attempted","Solved","Revisit"].indexOf(F.st);});
+  if(F.st!=="all")arr=arr.filter(q=>{const g=get(q.i);return F.st==="Solved"?(g.s===2||g.m):F.st==="Not Started"?(g.s===0&&!g.m):g.s===["Not Started","Attempted","Solved","Revisit"].indexOf(F.st);});
   if(F.rev!=="all")arr=arr.filter(q=>{const g=get(q.i);return F.rev==="r1"?g.r1:F.rev==="r1x"?(!g.r1&&!g.m):F.rev==="r2"?g.r2:F.rev==="r2x"?!g.r2:F.rev==="m"?g.m:g.s===3;});
   if(F.hint!=="all")arr=arr.filter(q=>{const g=get(q.i);return F.hint==="none"?!g.h.some(x=>x):g.h[+F.hint-1]===1;});
   const t=F.q.trim().toLowerCase();
@@ -1312,7 +1312,7 @@ function filterBar(){
   sel("src","Source",["LeetCode"],F.src)+
   sel("st","Status",["Not Started","Attempted","Solved","Revisit"],F.st)+
   sel("rev","Revision",["r1x","r1","r2x","r2","m"],F.rev).replace(/<option( selected)?>(r1x|r1|r2x|r2|m)<\/option>/g,(m,sel,v)=>{const names={r1x:"Rev 1 incomplete",r1:"Rev 1 complete",r2x:"Rev 2 incomplete",r2:"Rev 2 complete",m:"Mastered"};return'<option value="'+v+'"'+(sel||"")+'>'+names[v]+'</option>';})+
-  sel("hint","Hint",["1","2","3"],F.hint).replace(/<option(1|2|3)/g,'<option value="$1"')+
+  sel("hint","Hint",["1","2","3"],F.hint).replace(/<option>(1|2|3)/g,'<option value="$1">')+  
   '<label>Sort<select data-f="sort"><option value="cur">Curriculum order</option><option value="diff"'+(SORT==="diff"?" selected":"")+'>Difficulty</option><option value="pat"'+(SORT==="pat"?" selected":"")+'>Pattern</option><option value="topic"'+(SORT==="topic"?" selected":"")+'>Topic</option><option value="co"'+(SORT==="co"?" selected":"")+'>Company</option><option value="done"'+(SORT==="done"?" selected":"")+'>Completion</option><option value="rev"'+(SORT==="rev"?" selected":"")+'>Revision status</option></select></label>'+
   '<button class="btn sm freset" data-act="clearf">Reset filters</button></div>';
 }
@@ -1349,8 +1349,7 @@ function renderMixed(){
 let MIXDF=0;
 function drawMixed(){
   const started=new Set(Q.filter(q=>{const g=get(q.i);return g.s===2||g.m;}).map(q=>q.topicKey));
-  let pool=Q.filter(q=>started.size?q.topicKey:""?(started.has(q.topicKey)):true);
-  pool=Q.filter(q=>(!started.size||started.has(q.topicKey))&&(MIXDF===0||q.d===MIXDF-1));
+  let pool=Q.filter(q=>(!started.size||started.has(q.topicKey))&&(MIXDF===0||q.d===MIXDF-1));
   if(!pool.length)pool=Q.filter(q=>MIXDF===0||q.d===MIXDF-1);
   if(!pool.length){toast("No problems at that difficulty");return;}
   let q=pool[Math.floor(Math.random()*pool.length)];
@@ -1435,8 +1434,6 @@ function render(){
   if(a==="export"){doExport();return;}
   if(a==="import"){$("#importfile").click();return;}
   if(a==="reset"){askReset();return;}
-  if(a==="mreset"||a==="mcancel"){$("#modal").classList.remove("open");return;}
-  if(a==="mconfirm"){$("#modal").classList.remove("open");P={};save();EXP.clear();MIX={cur:null,seen:0};render();toast("All progress reset");return;}
   if(id===null)return;
   const g=get(id);
   if(a==="tog"){EXP.has(id)?EXP.delete(id):EXP.add(id);render();return;}
@@ -1461,20 +1458,20 @@ function render(){
 });
  $("#view").addEventListener("change",e=>{
   const el=e.target;if(!el.dataset)return;
-  if(el.dataset.f==="sort"){SORT=el.value;render();return;}
-  if(!el.dataset.field)return;
-  const card=el.closest("[data-qid]");if(!card)return;
-  const id=+card.dataset.qid,f=el.dataset.field;
-  if(f==="mis"){set(id,{mis:+el.value});updateTop();}
-});
- $("#view").addEventListener("change",e=>{
-  const el=e.target;if(el.dataset&&el.dataset.f&&el.dataset.f!=="sort"){
+  // filter dropdowns (data-f)
+  if(el.dataset.f){
+    if(el.dataset.f==="sort"){SORT=el.value;render();return;}
     const map={topic:"topic",phase:"phase",diff:"diff",pat:"pat",co:"co",src:"src",st:"st",rev:"rev",hint:"hint"};
     const f=map[el.dataset.f];if(!f)return;
     let v=el.value;
     if(f==="topic"){const t=TOPICS.find(t=>t.name===v);v=t?t.key:"all";}
-    F[f]=v;render();
+    F[f]=v;render();return;
   }
+  // card-level fields (data-field)
+  if(!el.dataset.field)return;
+  const card=el.closest("[data-qid]");if(!card)return;
+  const id=+card.dataset.qid,f=el.dataset.field;
+  if(f==="mis"){set(id,{mis:+el.value});updateTop();}
 });
  $("#search").addEventListener("input",e=>{
   F.q=e.target.value;
@@ -1500,7 +1497,7 @@ function doExport(){
   fr.onload=()=>{
     try{
       const o=JSON.parse(fr.result);
-      const pr=o&&o.progress&&typeof o.progress==="object"?o.progress:(o&&typeof o==="object"&&!Array.isArray(o)&&("s" in Q[0]?o:null)?o:null);
+      const pr=o&&o.progress&&typeof o.progress==="object"?o.progress:(o&&typeof o==="object"&&!Array.isArray(o)&&Object.keys(o).length&&("s" in (Object.values(o)[0]||{}))?o:null);
       if(!pr||typeof pr!=="object")throw 0;
       const clean={};
       Object.keys(pr).forEach(k=>{const n=+k;if(!Q[n])return;const x=pr[k]||{};clean[n]={s:x.s|0,r1:x.r1?1:0,r2:x.r2?1:0,m:x.m?1:0,h:[x.h&&x.h[0]?1:0,x.h&&x.h[1]?1:0,x.h&&x.h[2]?1:0],sol:x.sol|0,notes:String(x.notes||""),mis:x.mis|0,learn:String(x.learn||""),rem:String(x.rem||""),att:x.att|0,last:+x.last||0,sec:+x.sec||0,min:+x.min||0,rv:x.rv?1:0,pid:x.pid?1:0};});
@@ -1514,7 +1511,13 @@ function askReset(){
   $("#mbox").innerHTML='<h3>Reset all progress?</h3><p>This wipes every status, revision, hint log, note, mistake and timer for all 400 problems. There is no undo — export first if in doubt.</p><div class="acts"><button class="btn" data-act="mcancel">Cancel</button><button class="btn dng" data-act="mconfirm">Yes, reset everything</button></div>';
   $("#modal").classList.add("open");
 }
- $("#modal").addEventListener("click",e=>{if(e.target.id==="modal")$("#modal").classList.remove("open");});
+ $("#modal").addEventListener("click",e=>{
+  if(e.target.id==="modal"){$("#modal").classList.remove("open");return;}
+  const act=e.target.closest("[data-act]");if(!act)return;
+  const a=act.dataset.act;
+  if(a==="mcancel"){$("#modal").classList.remove("open");return;}
+  if(a==="mconfirm"){$("#modal").classList.remove("open");P={};save();EXP.clear();MIX={cur:null,seen:0};render();toast("All progress reset");return;}
+});
 
 /* ---------- init ---------- */
 try{const t=localStorage.getItem("dsa400_theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}
